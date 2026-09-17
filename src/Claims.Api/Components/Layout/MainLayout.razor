@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="/" aria-label="Claims Portal home">
+                <span class="brand-mark" aria-hidden="true">CP</span>
+                <span>
+                    <strong>Claims Portal</strong>
+                    <small>Processing workspace</small>
+                </span>
+            </a>
+            <div class="header-actions">
+                <span class="environment-pill">Sandbox demonstration</span>
+                <nav aria-label="Primary navigation">
+                    <NavLink href="/" Match="NavLinkMatch.All">Claims</NavLink>
+                    <NavLink href="/claims/new">Submit claim</NavLink>
+                    <a href="/swagger" target="_blank" rel="noreferrer">API Explorer</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        @Body
+    </main>
+
+    <footer>
+        <span>Synthetic portfolio data only</span>
+        <span>No real patient or insurance information</span>
+    </footer>
+</div>

@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(
         new JsonStringEnumConverter(allowIntegerValues: false)))
@@ -28,6 +30,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ClaimService>();
+builder.Services.AddScoped<Claims.Api.Components.PortalClaimService>();
 builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
 builder.Services.AddDbContext<ClaimsDbContext>(o => o.UseSqlServer(
     builder.Configuration.GetConnectionString("Claims")
@@ -35,6 +38,7 @@ builder.Services.AddDbContext<ClaimsDbContext>(o => o.UseSqlServer(
 var app = builder.Build();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseAntiforgery();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -47,7 +51,9 @@ if (app.Environment.IsDevelopment())
         await DevelopmentSeeder.Seed(db);
     }
 }
+app.MapStaticAssets();
+app.MapRazorComponents<Claims.Api.Components.App>()
+    .AddInteractiveServerRenderMode();
 app.MapControllers();
 app.Run();
 public partial class Program;
-

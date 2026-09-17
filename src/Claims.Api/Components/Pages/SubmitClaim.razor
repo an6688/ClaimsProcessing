@@ -1,0 +1,152 @@
+@page "/claims/new"
+@inject PortalClaimService Claims
+@inject NavigationManager Navigation
+
+<PageTitle>Submit claim · Claims Portal</PageTitle>
+
+<section class="page-heading">
+    <a class="back-link" href="/">← Claims dashboard</a>
+    <p class="eyebrow">New submission</p>
+    <h1>Submit a test claim</h1>
+    <p>Create a claim with one or more service lines. Processing happens separately after submission.</p>
+</section>
+
+@if (_error is not null)
+{
+    <div class="alert alert-error" role="alert">@_error</div>
+}
+
+<EditForm Model="_model" OnValidSubmit="Submit" class="claim-form">
+    <DataAnnotationsValidator />
+
+    <section class="panel form-section">
+        <div class="panel-heading">
+            <div>
+                <h2>Claim participants</h2>
+                <p>Choose from the seeded demonstration records.</p>
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="field">
+                <label for="member">Member</label>
+                <InputSelect id="member" @bind-Value="_model.MemberId">
+                    <option value="@DemoData.ActiveMember">Synthetic Member 1 · Active</option>
+                    <option value="@DemoData.ExpiredMember">Synthetic Member 2 · Coverage ended</option>
+                    <option value="@DemoData.InactiveMember">Synthetic Member 3 · Inactive</option>
+                </InputSelect>
+                <ValidationMessage For="() => _model.MemberId" />
+            </div>
+            <div class="field">
+                <label for="provider">Provider</label>
+                <InputSelect id="provider" @bind-Value="_model.ProviderId">
+                    <option value="@DemoData.ActiveProvider">Synthetic Clinic 1 · Active</option>
+                    <option value="@DemoData.SecondActiveProvider">Synthetic Clinic 2 · Active</option>
+                    <option value="@DemoData.InactiveProvider">Synthetic Clinic 3 · Inactive</option>
+                </InputSelect>
+                <ValidationMessage For="() => _model.ProviderId" />
+            </div>
+        </div>
+    </section>
+
+    <section class="panel form-section">
+        <div class="panel-heading">
+            <div>
+                <h2>Service lines</h2>
+                <p>Amounts are calculated by the server.</p>
+            </div>
+            <button class="button button-secondary" type="button" @onclick="AddLine">Add line</button>
+        </div>
+
+        <ValidationMessage For="() => _model.Lines" />
+
+        <div class="line-stack">
+            @for (var index = 0; index < _model.Lines.Count; index++)
+            {
+                var line = _model.Lines[index];
+                var lineNumber = index + 1;
+                var codeId = $"code-{index}";
+                var dateId = $"date-{index}";
+                var quantityId = $"quantity-{index}";
+                var priceId = $"price-{index}";
+                <article class="service-line" @key="line">
+                    <div class="line-heading">
+                        <h3>Service line @lineNumber</h3>
+                        @if (_model.Lines.Count > 1)
+                        {
+                            <button class="text-button danger" type="button" @onclick="() => RemoveLine(line)">Remove</button>
+                        }
+                    </div>
+                    <div class="line-grid">
+                        <div class="field">
+                            <label for="@codeId">Procedure code</label>
+                            <InputText id="@codeId" @bind-Value="line.ProcedureCode" placeholder="e.g. SYN-EXAM-01" />
+                            <ValidationMessage For="() => line.ProcedureCode" />
+                        </div>
+                        <div class="field">
+                            <label for="@dateId">Service date</label>
+                            <InputDate id="@dateId" @bind-Value="line.ServiceDate" />
+                            <ValidationMessage For="() => line.ServiceDate" />
+                        </div>
+                        <div class="field">
+                            <label for="@quantityId">Quantity</label>
+                            <InputNumber id="@quantityId" @bind-Value="line.Quantity" />
+                            <ValidationMessage For="() => line.Quantity" />
+                        </div>
+                        <div class="field">
+                            <label for="@priceId">Unit price</label>
+                            <div class="money-input">
+                                <span>$</span>
+                                <InputNumber id="@priceId" @bind-Value="line.UnitPrice" step="0.01" placeholder="0.00" />
+                            </div>
+                            <ValidationMessage For="() => line.UnitPrice" />
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <a class="button button-secondary" href="/">Cancel</a>
+        <button class="button button-primary" type="submit" disabled="@_submitting">
+            @(_submitting ? "Submitting…" : "Submit claim")
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    private readonly ClaimFormModel _model = new();
+    private bool _submitting;
+    private string? _error;
+
+    private void AddLine() => _model.Lines.Add(new ClaimLineFormModel());
+
+    private void RemoveLine(ClaimLineFormModel line) => _model.Lines.Remove(line);
+
+    private async Task Submit()
+    {
+        _submitting = true;
+        _error = null;
+        try
+        {
+            var claim = await Claims.Submit(_model.ToRequest(), CancellationToken.None);
+            Navigation.NavigateTo($"/claims/{claim.Id}");
+        }
+        catch (RequestValidationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (ResourceNotFoundException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception)
+        {
+            _error = "The claim could not be submitted. Try again or check the API logs.";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

@@ -1,0 +1,114 @@
+@page "/"
+@inject PortalClaimService Claims
+
+<PageTitle>Claims · Claims Portal</PageTitle>
+
+<section class="page-heading heading-with-action">
+    <div>
+        <p class="eyebrow">Operations workspace</p>
+        <h1>Claims dashboard</h1>
+        <p>Submit test claims, evaluate them against processing rules, and inspect every decision.</p>
+    </div>
+    <a class="button button-primary" href="/claims/new">Submit a claim</a>
+</section>
+
+@if (_loading)
+{
+    <div class="loading-state" aria-live="polite">Loading claims…</div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-error" role="alert">@_error</div>
+}
+else
+{
+    <section class="summary-grid" aria-label="Claim summary">
+        <article class="summary-card summary-total"><span>Total claims</span><strong>@_claims.Count</strong><small>All submissions</small></article>
+        <article class="summary-card summary-pending"><span>Awaiting review</span><strong>@Count(ClaimStatus.Submitted)</strong><small>Ready to process</small></article>
+        <article class="summary-card summary-approved"><span>Approved</span><strong>@Count(ClaimStatus.Approved)</strong><small>Rules passed</small></article>
+        <article class="summary-card summary-denied"><span>Denied</span><strong>@Count(ClaimStatus.Denied)</strong><small>Decision recorded</small></article>
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Recent claims</h2>
+                <p>Newest submissions appear first.</p>
+            </div>
+            <button class="button button-secondary" type="button" @onclick="Load">Refresh</button>
+        </div>
+
+        @if (_claims.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No claims yet</h3>
+                <p>Submit the first synthetic claim to see the workflow.</p>
+                <a class="text-link" href="/claims/new">Create a claim →</a>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Claim</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th>Lines</th>
+                            <th class="number">Amount</th>
+                            <th><span class="sr-only">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var claim in _claims)
+                    {
+                        <tr>
+                            <td>
+                                <a class="claim-id" href="/claims/@claim.Id">
+                                    @ShortId(claim.Id)
+                                </a>
+                                <small>Member @ShortId(claim.MemberId)</small>
+                            </td>
+                            <td>@claim.SubmittedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                            <td><StatusBadge Status="claim.Status" /></td>
+                            <td>@claim.Lines.Count</td>
+                            <td class="number">@claim.TotalAmount.ToString("C")</td>
+                            <td><a class="row-link" href="/claims/@claim.Id" aria-label="Open claim @claim.Id">View →</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<ClaimResponse> _claims = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _claims = (await Claims.List(null, CancellationToken.None)).Items;
+        }
+        catch (Exception)
+        {
+            _error = "Claims could not be loaded. Confirm the database is available and try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private int Count(ClaimStatus status) => _claims.Count(claim => claim.Status == status);
+    private static string ShortId(Guid id) => id.ToString()[..8].ToUpperInvariant();
+}

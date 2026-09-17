@@ -1,0 +1,9 @@
+<span class="status-badge status-@Status.ToString().ToLowerInvariant()">
+    <span class="status-dot" aria-hidden="true"></span>
+    @Status
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public ClaimStatus Status { get; set; }
+}

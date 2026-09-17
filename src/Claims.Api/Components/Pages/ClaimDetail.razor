@@ -1,0 +1,179 @@
+@page "/claims/{Id:guid}"
+@inject PortalClaimService Claims
+
+<PageTitle>Claim detail · Claims Portal</PageTitle>
+
+@if (_loading)
+{
+    <div class="loading-state">Loading claim…</div>
+}
+else if (_notFound)
+{
+    <section class="empty-state">
+        <p class="eyebrow">Claim not found</p>
+        <h1>We could not find that claim.</h1>
+        <a class="button button-primary" href="/">Return to claims</a>
+    </section>
+}
+else if (_claim is not null)
+{
+    <section class="page-heading detail-heading">
+        <a class="back-link" href="/">← Claims dashboard</a>
+        <div class="detail-title">
+            <div>
+                <p class="eyebrow">Claim @ShortId(_claim.Id)</p>
+                <h1>Claim detail</h1>
+                <p class="full-id">@_claim.Id</p>
+            </div>
+            <StatusBadge Status="_claim.Status" />
+        </div>
+    </section>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-error" role="alert">@_error</div>
+    }
+
+    @if (_claim.DenialReason is not null)
+    {
+        <section class="decision-card denied-decision">
+            <div>
+                <span class="decision-label">Denial reason</span>
+                <h2>@Humanize(_claim.DenialReason.Code.ToString())</h2>
+                <p>@_claim.DenialReason.Message</p>
+            </div>
+            @if (_claim.DenialReason.DuplicateClaimId.HasValue)
+            {
+                <a class="text-link" href="/claims/@_claim.DenialReason.DuplicateClaimId">
+                    View original claim →
+                </a>
+            }
+        </section>
+    }
+    else if (_claim.Status == ClaimStatus.Approved)
+    {
+        <section class="decision-card approved-decision">
+            <div>
+                <span class="decision-label">Decision</span>
+                <h2>Claim approved</h2>
+                <p>All synthetic eligibility and duplicate checks passed.</p>
+            </div>
+        </section>
+    }
+
+    <section class="detail-grid">
+        <article class="panel detail-card">
+            <h2>Overview</h2>
+            <dl>
+                <div><dt>Member</dt><dd>@ShortId(_claim.MemberId)</dd></div>
+                <div><dt>Provider</dt><dd>@ShortId(_claim.ProviderId)</dd></div>
+                <div><dt>Submitted</dt><dd>@FormatDate(_claim.SubmittedAt)</dd></div>
+                <div><dt>Processed</dt><dd>@(_claim.ProcessedAt.HasValue ? FormatDate(_claim.ProcessedAt.Value) : "Not yet")</dd></div>
+                <div><dt>Total</dt><dd class="amount">@_claim.TotalAmount.ToString("C")</dd></div>
+            </dl>
+        </article>
+
+        <article class="panel workflow-card">
+            <h2>Workflow</h2>
+            <ol class="workflow">
+                <li class="complete"><span>1</span><div><strong>Submitted</strong><small>@FormatDate(_claim.SubmittedAt)</small></div></li>
+                <li class="@(_claim.ValidatedAt.HasValue ? "complete" : "")"><span>2</span><div><strong>Validated</strong><small>@(_claim.ValidatedAt.HasValue ? FormatDate(_claim.ValidatedAt.Value) : "Pending")</small></div></li>
+                <li class="@(_claim.ProcessedAt.HasValue ? "complete" : "")"><span>3</span><div><strong>Decision</strong><small>@(_claim.ProcessedAt.HasValue ? _claim.Status.ToString() : "Pending")</small></div></li>
+            </ol>
+            @if (_claim.Status == ClaimStatus.Submitted)
+            {
+                <button class="button button-primary full-width" type="button" @onclick="Process" disabled="@_processing">
+                    @(_processing ? "Processing…" : "Process claim")
+                </button>
+            }
+        </article>
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Service lines</h2>
+                <p>@_claim.Lines.Count line@(_claim.Lines.Count == 1 ? "" : "s")</p>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Procedure</th><th>Service date</th><th class="number">Quantity</th><th class="number">Unit price</th><th class="number">Amount</th></tr>
+                </thead>
+                <tbody>
+                @foreach (var line in _claim.Lines)
+                {
+                    <tr>
+                        <td><strong>@line.ProcedureCode</strong></td>
+                        <td>@line.ServiceDate.ToString("MMM d, yyyy")</td>
+                        <td class="number">@line.Quantity</td>
+                        <td class="number">@line.UnitPrice.ToString("C")</td>
+                        <td class="number"><strong>@line.Amount.ToString("C")</strong></td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr><td colspan="4">Claim total</td><td class="number">@_claim.TotalAmount.ToString("C")</td></tr>
+                </tfoot>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ClaimResponse? _claim;
+    private bool _loading = true;
+    private bool _notFound;
+    private bool _processing;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _notFound = false;
+        try
+        {
+            _claim = await Claims.Get(Id, CancellationToken.None);
+        }
+        catch (ResourceNotFoundException)
+        {
+            _notFound = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Process()
+    {
+        _processing = true;
+        _error = null;
+        try
+        {
+            _claim = await Claims.Process(Id, CancellationToken.None);
+        }
+        catch (ProcessingConflictException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception)
+        {
+            _error = "The claim could not be processed. Try again or check the API logs.";
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private static string ShortId(Guid id) => id.ToString()[..8].ToUpperInvariant();
+    private static string FormatDate(DateTimeOffset value) => value.ToLocalTime().ToString("MMM d, yyyy h:mm tt");
+
+    private static string Humanize(string value) =>
+        string.Concat(value.Select((character, index) =>
+            index > 0 && char.IsUpper(character) ? $" {character}" : character.ToString()));
+}

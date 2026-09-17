@@ -1,114 +1,66 @@
-# Synthetic Claims Processing
+# Claims Processing
 
-A compact portfolio backend built with C#, ASP.NET Core 10, EF Core 10, SQL Server, xUnit, Docker Compose and GitHub Actions. It uses synthetic data only and does not represent production healthcare adjudication.
+A production-style portfolio app for submitting and adjudicating synthetic healthcare claims. It pairs a Blazor operations portal with an ASP.NET Core API, explicit business rules, SQL Server persistence, and end-to-end tests.
 
-## Quick Start on Windows
+> Synthetic data only. This project demonstrates software design; it does not model real healthcare adjudication or claim compliance.
 
-This machine has SQL Server Express installed as `.\\SQLEXPRESS`. LocalDB is not installed, so the checked-in Development profile uses SQL Server Express with Windows authentication.
+## What it demonstrates
 
-Prerequisites:
+- A complete `Submitted → Validated → Approved / Denied` workflow
+- Structured denial decisions for eligibility, provider, date, line, and duplicate checks
+- A Blazor dashboard, claim form, claim detail view, and Swagger/OpenAPI contract
+- EF Core migrations, repeatable development seed data, and SQL Server concurrency handling
+- Unit and integration coverage, including real Kestrel request-limit behavior
+- Windows-native development, optional Docker Compose, and GitHub Actions CI
 
-- Visual Studio 2026 or the .NET 10 SDK
-- A running SQL Server Express instance named `SQLEXPRESS`
+## Try the workflow
 
-Open `ClaimsProcessing.sln`, select `Claims.Api`, and press F5. The Development profile:
+Run the app, open `http://localhost:5080`, and:
 
-1. connects to `.\\SQLEXPRESS` using Windows authentication;
-2. applies committed EF Core migrations;
-3. adds repeatable synthetic seed data;
-4. starts the API at `http://localhost:5080`; and
-5. opens `/swagger`.
+1. Submit a claim with one or more service lines.
+2. Open the claim and process it.
+3. Inspect the approval or structured denial decision.
 
-Automatic migration and seeding run only in the Development environment when `Database:Initialize` is true. The repeatable seeder restores the documented values of its three known synthetic members and providers while preserving claims and unrelated data. Production configuration does not migrate or seed at application startup.
+The demo includes active, expired, and inactive member/provider records so both approval and denial paths are easy to exercise. Swagger is available at `http://localhost:5080/swagger`.
 
-If LocalDB is installed on another Windows machine, override the connection string with:
-
-```powershell
-$env:ConnectionStrings__Claims = 'Server=(localdb)\MSSQLLocalDB;Database=ClaimsPortfolio;Integrated Security=True;Encrypt=False'
-dotnet run --project src/Claims.Api
-```
-
-If the SQL Server Express instance name differs, update the Development connection string or provide the same environment variable.
-
-## Docker/containerized startup
-
-Docker remains an optional path. Copy the example environment file, replace its password, then start both SQL Server and the API:
-
-```powershell
-Copy-Item .env.example .env
-docker compose up --build -d
-docker compose logs -f api
-```
-
-Swagger is at `http://localhost:8080/swagger`. Compose binds the API and database ports to loopback. The SQL health check gates API startup, and Development startup applies migrations and seed data.
-
-Stop with `docker compose down`. Data remains in the `claims-sql` volume. `docker compose down -v` deliberately removes that local demo data.
-
-## Domain and processing rules
-
-A claim belongs to one member and provider and contains 1–100 service lines. Submission validates IDs, dates, procedure codes, quantities and prices. Submission rejects malformed claims; processing evaluates valid stored claims.
-
-`POST /api/claims/{id}/process` transitions a Submitted claim through Validated to Approved or Denied. A decision is immutable: repeating the processing request returns the stored decision.
-
-A claim is denied when:
-
-- the member or provider is unavailable during processing;
-- the provider is inactive;
-- the member is inactive or any line's service date lies outside the inclusive coverage interval;
-- a stored line is invalid or has a future date; or
-- an already processed claim for the same member and provider contains a line with the same service date and case-insensitive procedure code.
-
-That duplicate rule is deliberately simplified for this portfolio. It is not a representation of real healthcare claims adjudication. A matching line denies the entire new claim. Both Approved and Denied claims count as processed for future duplicate checks. The response includes a structured `denialReason` with a code, message and, for duplicates, the original claim ID.
-
-Input validation normally prevents future dates, empty claims, invalid codes and nonpositive amounts from being stored. Processing defensively checks those invariants again for legacy or direct database writes.
-
-SQL Server processing serializes decisions per member before duplicate detection. This prevents two matching claims processed concurrently by different API instances from both being approved.
-
-## API
-
-- `POST /api/claims` — submit a synthetic claim; returns 201.
-- `POST /api/claims/{id}/process` — make or retrieve its decision; returns 200.
-- `GET /api/claims/{id}` — retrieve lines and decision details.
-- `GET /api/members/{id}/claims?page=1&pageSize=20` — member claims.
-- `GET /api/claims?status=Denied&page=1&pageSize=20` — optional status filter.
-- `GET /api/health` — database readiness; returns 200 or 503.
-
-The request body limit for submission is 128 KiB; larger fixed-length and chunked requests return 413 Problem Details. All 400 validation responses use Validation Problem Details with an `errors` dictionary and trace ID. Unexpected failures return a sanitized 500 response.
-
-Development seed IDs end in `000000000001`, `000000000002` and `000000000003`:
-
-- Member 1 and Provider 1 are active with open-ended coverage.
-- Member 2 has coverage ending 2024-12-31.
-- Member 3 is inactive.
-- Provider 3 is inactive.
-
-Example:
-
-```json
-{
-  "memberId": "10000000-0000-0000-0000-000000000001",
-  "providerId": "20000000-0000-0000-0000-000000000001",
-  "lines": [
-    {
-      "procedureCode": "SYN-EXAM",
-      "serviceDate": "2025-01-15",
-      "quantity": 2,
-      "unitPrice": 75.25
-    }
-  ]
-}
-```
+Duplicate detection is deliberately simple: a processed claim matches when member, provider, service date, and procedure code match. This portfolio rule is not a representation of real claim adjudication.
 
 ## Architecture
 
-- `Claims.Domain`: entities, invariants, status transitions and structured denial concepts.
-- `Claims.Application`: API contracts, orchestration and the use-case-specific repository contract.
-- `Claims.Infrastructure`: EF Core mappings, SQL Server persistence, migrations and development seeding.
-- `Claims.Api`: controllers, dependency injection, OpenAPI and centralized error handling.
-- `Claims.UnitTests`: domain invariants and processing decisions.
-- `Claims.IntegrationTests`: HTTP behavior through ASP.NET Core, real Kestrel request-limit tests, and an optional SQL Server migration/concurrency test.
+The solution keeps a focused four-layer structure:
 
-Dependencies point inward. The design intentionally omits CQRS, MediatR, message buses and distributed infrastructure.
+- `Claims.Domain` — entities, invariants, status transitions, and denial concepts
+- `Claims.Application` — contracts and use-case orchestration
+- `Claims.Infrastructure` — EF Core, SQL Server, migrations, and seed data
+- `Claims.Api` — REST endpoints, Blazor UI, OpenAPI, and error handling
+
+Dependencies point inward. The project intentionally avoids CQRS, MediatR, message buses, and distributed infrastructure.
+
+## Quick Start on Windows
+
+Prerequisites: .NET 10 and SQL Server Express at `.\SQLEXPRESS`.
+
+Open `ClaimsProcessing.sln`, select `Claims.Api`, and press F5. In Development, the app applies committed migrations, restores the documented synthetic seed records, starts at `http://localhost:5080`, and opens the portal.
+
+For another SQL Server instance, override the connection string:
+
+```powershell
+$env:ConnectionStrings__Claims = 'Server=YOUR_SERVER;Database=ClaimsPortfolio;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
+dotnet run --project src/Claims.Api
+```
+
+Automatic migration and seeding are Development-only and controlled by `Database:Initialize`.
+
+## API
+
+- `POST /api/claims` — submit a claim
+- `POST /api/claims/{id}/process` — adjudicate a submitted claim
+- `GET /api/claims/{id}` — retrieve claim lines and decision details
+- `GET /api/claims?status=Denied&page=1&pageSize=20` — filter and page claims
+- `GET /api/members/{id}/claims?page=1&pageSize=20` — list a member's claims
+- `GET /api/health` — database readiness
+
+Validation uses Problem Details consistently. The claim request limit is 128 KiB; oversized fixed-length and chunked requests return HTTP 413.
 
 ## Running tests
 
@@ -118,39 +70,29 @@ dotnet build ClaimsProcessing.sln -c Release --no-restore
 dotnet test ClaimsProcessing.sln -c Release --no-build
 ```
 
-The normal suite uses isolated relational SQLite databases for fast HTTP tests. The body-limit regression starts a real Kestrel TCP listener rather than using only the in-memory test server.
+The normal suite uses isolated SQLite databases. Set `CLAIMS_TEST_SQLSERVER` to run the optional SQL Server migration and concurrency test against a disposable database.
 
-Run the SQL Server migration/repository/concurrent-processing test against a disposable local server:
+## Docker/containerized startup
 
 ```powershell
-$env:CLAIMS_TEST_SQLSERVER = 'Server=.\SQLEXPRESS;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
-dotnet test tests/Claims.IntegrationTests/Claims.IntegrationTests.csproj -c Release --filter FullyQualifiedName~SqlServerTests
+Copy-Item .env.example .env
+# Replace the example password in .env
+docker compose up --build -d
 ```
 
-The test creates a uniquely named database, applies real migrations, verifies no model drift, exercises concurrent duplicate decisions, and deletes only that database. GitHub Actions supplies an ephemeral SQL Server service and runs this test on pushes and pull requests.
+The portal runs at `http://localhost:8080`; Swagger is at `/swagger`. Stop with `docker compose down`. Add `-v` only when you intend to remove the demo database volume.
 
 ## Database configuration
 
-Configuration precedence follows ASP.NET Core conventions. The checked-in base settings contain no credentials. Development defaults live in `src/Claims.Api/appsettings.Development.json`; environment variables can override them:
+The base configuration contains no credentials. Development defaults live in `src/Claims.Api/appsettings.Development.json`, and standard ASP.NET Core environment variables override them:
 
 ```powershell
-$env:ConnectionStrings__Claims = 'Server=YOUR_SERVER;Database=ClaimsPortfolio;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
+$env:ConnectionStrings__Claims = 'Server=(localdb)\MSSQLLocalDB;Database=ClaimsPortfolio;Integrated Security=True;Encrypt=False'
 $env:Database__Initialize = 'true'
 ```
 
-Committed migrations are under `src/Claims.Infrastructure/Migrations`. Common commands:
+Production deployments should apply reviewed migration scripts separately with a least-privilege identity.
 
-```powershell
-dotnet tool restore
-dotnet ef migrations list --project src/Claims.Infrastructure --startup-project src/Claims.Api
-dotnet ef migrations has-pending-model-changes --project src/Claims.Infrastructure --startup-project src/Claims.Api
-dotnet ef migrations script --idempotent --project src/Claims.Infrastructure --startup-project src/Claims.Api --output migration.sql
-```
+## Scope
 
-For production, review and apply migration scripts separately with an appropriately privileged identity. Do not grant schema modification rights to the normal runtime identity.
-
-## Security and scope
-
-This local demonstration has no authentication, member-level authorization, rate limiting, audit trail or transport-level retry key. Use synthetic data only. No HIPAA compliance claim is made.
-
-EF Core parameterizes queries; the API does not log request bodies; exception responses omit stack traces; Swagger and automatic migrations are Development-only. A real deployment would require authentication and authorization, managed secrets, validated TLS, least-privilege database credentials, auditing, monitoring, retention policy and threat modeling.
+This local demo has no authentication, authorization, audit trail, or rate limiting. Use synthetic data only; no HIPAA compliance claim is made.

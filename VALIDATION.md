@@ -14,6 +14,7 @@ Verified on 2026-09-17 with .NET SDK 10.0.401 on Windows.
 - SQL Server Express `MSSQL$SQLEXPRESS` is installed and running on this machine. SQL Server LocalDB is not installed.
 - Before the processing changes, the existing real SQL Server migration/repository test completed successfully against `.\\SQLEXPRESS`.
 - User-confirmed Windows/Visual Studio smoke test after the processing changes: F5 startup connected to SQL Server Express, applied Development initialization, restored the synthetic seed records, submitted claim `8da0dade-c8a3-40a1-b600-9d9c3bc02f97`, and processed it to `Approved` with persisted validation/processing timestamps and no denial reason.
+- Blazor portal verification: Release compilation succeeds; integration tests render the dashboard and submission form and verify that a processed denial appears with its structured reason on the claim-detail page.
 
 ## Environment limitation
 

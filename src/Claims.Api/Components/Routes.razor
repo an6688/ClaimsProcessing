@@ -1,0 +1,17 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found · Claims Portal</PageTitle>
+        <LayoutView Layout="typeof(MainLayout)">
+            <section class="empty-state">
+                <p class="eyebrow">404</p>
+                <h1>That page does not exist.</h1>
+                <p>Return to the claims dashboard to continue.</p>
+                <a class="button button-primary" href="/">View claims</a>
+            </section>
+        </LayoutView>
+    </NotFound>
+</Router>
