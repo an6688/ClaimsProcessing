@@ -69,7 +69,7 @@ else if (_claim is not null)
                 <div><dt>Provider</dt><dd>@ShortId(_claim.ProviderId)</dd></div>
                 <div><dt>Submitted</dt><dd>@FormatDate(_claim.SubmittedAt)</dd></div>
                 <div><dt>Processed</dt><dd>@(_claim.ProcessedAt.HasValue ? FormatDate(_claim.ProcessedAt.Value) : "Not yet")</dd></div>
-                <div><dt>Total</dt><dd class="amount">@_claim.TotalAmount.ToString("C")</dd></div>
+                <div><dt>Total</dt><dd class="amount">@_claim.TotalAmount.ToString("C", CultureInfo.GetCultureInfo("en-US"))</dd></div>
             </dl>
         </article>
 
@@ -108,13 +108,13 @@ else if (_claim is not null)
                         <td><strong>@line.ProcedureCode</strong></td>
                         <td>@line.ServiceDate.ToString("MMM d, yyyy")</td>
                         <td class="number">@line.Quantity</td>
-                        <td class="number">@line.UnitPrice.ToString("C")</td>
-                        <td class="number"><strong>@line.Amount.ToString("C")</strong></td>
+                        <td class="number">@line.UnitPrice.ToString("C", CultureInfo.GetCultureInfo("en-US"))</td>
+                        <td class="number"><strong>@line.Amount.ToString("C", CultureInfo.GetCultureInfo("en-US"))</strong></td>
                     </tr>
                 }
                 </tbody>
                 <tfoot>
-                    <tr><td colspan="4">Claim total</td><td class="number">@_claim.TotalAmount.ToString("C")</td></tr>
+                    <tr><td colspan="4">Claim total</td><td class="number">@_claim.TotalAmount.ToString("C", CultureInfo.GetCultureInfo("en-US"))</td></tr>
                 </tfoot>
             </table>
         </div>

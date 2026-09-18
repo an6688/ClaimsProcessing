@@ -73,7 +73,7 @@ else
                             <td>@claim.SubmittedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
                             <td><StatusBadge Status="claim.Status" /></td>
                             <td>@claim.Lines.Count</td>
-                            <td class="number">@claim.TotalAmount.ToString("C")</td>
+                            <td class="number">@claim.TotalAmount.ToString("C", CultureInfo.GetCultureInfo("en-US"))</td>
                             <td><a class="row-link" href="/claims/@claim.Id" aria-label="Open claim @claim.Id">View →</a></td>
                         </tr>
                     }
